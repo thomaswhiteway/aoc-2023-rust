@@ -1,0 +1,87 @@
+use aocf::Aoc;
+use failure::Error;
+use std::fs::read_to_string;
+use std::path::Path;
+use std::str::FromStr;
+
+mod a_star;
+mod common;
+mod day01;
+mod parsers;
+
+#[derive(Debug, Eq, PartialEq)]
+pub enum Part {
+    One,
+    Two,
+}
+
+impl FromStr for Part {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "one" => Ok(Part::One),
+            "two" => Ok(Part::Two),
+            _ => Err(format!("Unknown part {}", s)),
+        }
+    }
+}
+
+pub trait Solver {
+    type Problem;
+
+    fn parse_input(data: String) -> Result<Self::Problem, Error>;
+    fn solve(problem: Self::Problem) -> (Option<String>, Option<String>);
+}
+
+fn read_from_server(aoc: &mut Aoc) -> Result<String, Error> {
+    aoc.get_input(false)
+}
+
+pub fn read_input<P: AsRef<Path>>(path: Option<P>, aoc: &mut Aoc) -> Result<String, Error> {
+    if let Some(path) = &path {
+        Ok(read_to_string(path)?)
+    } else {
+        read_from_server(aoc)
+    }
+}
+
+fn display_solution(part: usize, solution: &str) {
+    if solution.contains('\n') {
+        println!("Part {}:\n{}", part, solution);
+    } else {
+        println!("Part {}: {}", part, solution);
+    }
+}
+
+pub fn solve<S: Solver>(data: String, aoc: &mut Aoc, submit: Option<Part>) -> Result<(), Error> {
+    let problem = S::parse_input(data)?;
+    let (part_one, part_two) = S::solve(problem);
+
+    if let Some(solution) = part_one {
+        display_solution(1, &solution);
+
+        if submit == Some(Part::One) {
+            let outcome = (*aoc).submit(&solution)?;
+            println!("{}", outcome);
+        }
+    }
+
+    if let Some(solution) = part_two {
+        display_solution(2, &solution);
+
+        if submit == Some(Part::Two) {
+            let outcome = aoc.submit(&solution)?;
+            println!("{}", outcome);
+        }
+    }
+
+    Ok(())
+}
+
+pub fn solve_day(day: u32, data: String, aoc: &mut Aoc, submit: Option<Part>) -> Result<(), Error> {
+    match day {
+        1 => solve::<day01::Solver>(data, aoc, submit),
+        _ => Err(failure::err_msg(format!("Invalid day {}", day))),
+    }
+}
