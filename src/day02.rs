@@ -1,6 +1,3 @@
-use failure::Error;
-use nom::complete;
-
 mod parse {
     use failure::{err_msg, Error};
     use nom::{
@@ -57,7 +54,9 @@ mod parse {
     }
 }
 
+use failure::Error;
 use parse::parse_input;
+use std::cmp::max;
 
 #[derive(PartialEq, Eq, Hash, Clone, Copy)]
 enum Colour {
@@ -76,6 +75,20 @@ fn is_game_possible(rounds: &[[usize; 3]], candidate: &[usize; 3]) -> bool {
         .all(|round| is_round_possible(round, candidate))
 }
 
+fn game_min_cubes(rounds: &Vec<[usize; 3]>) -> [usize; 3] {
+    rounds
+        .iter()
+        .fold(vec![0, 0, 0], |current, round| {
+            current
+                .iter()
+                .zip(round.iter())
+                .map(|(&c, &r)| max(c, r))
+                .collect::<Vec<_>>()
+        })
+        .try_into()
+        .unwrap()
+}
+
 pub struct Solver {}
 
 impl super::Solver for Solver {
@@ -89,7 +102,7 @@ impl super::Solver for Solver {
         let candidate = [12, 13, 14];
 
         let part1: usize = (1..)
-            .zip(games)
+            .zip(games.iter())
             .filter_map(|(game_id, game)| {
                 if is_game_possible(&game, &candidate) {
                     Some(game_id)
@@ -99,6 +112,12 @@ impl super::Solver for Solver {
             })
             .sum();
 
-        (Some(part1.to_string()), None)
+        let part2: usize = games
+            .iter()
+            .map(game_min_cubes)
+            .map(|min_cubes| min_cubes.iter().product::<usize>())
+            .sum();
+
+        (Some(part1.to_string()), Some(part2.to_string()))
     }
 }
