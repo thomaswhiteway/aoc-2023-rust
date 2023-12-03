@@ -1,5 +1,6 @@
 #![allow(unused)]
 
+use itertools::iproduct;
 use std::ops::{Add, Div, Mul, Sub};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
@@ -20,6 +21,19 @@ impl Position {
                 x: self.x + dx,
                 y: self.y + dy,
             })
+    }
+
+    pub fn surrounding(&self) -> impl Iterator<Item = Position> + '_ {
+        iproduct!([-1, 0, 1], [-1, 0, 1]).filter_map(|(dx, dy)| {
+            if dx != 0 || dy != 0 {
+                Some(Position {
+                    x: self.x + dx,
+                    y: self.y + dy,
+                })
+            } else {
+                None
+            }
+        })
     }
 
     pub fn direction_to(&self, other: &Self) -> Option<Direction> {

@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 aocf = { version = "0.1.21", features = ["html_parsing"] }
 failure = "0.1.8"
+itertools = "0.12.0"
 nom = "7.1.3"
 priority-queue = "1.3.2"
 structopt = "0.3.26"

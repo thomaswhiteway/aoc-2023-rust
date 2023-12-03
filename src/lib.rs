@@ -8,6 +8,7 @@ mod a_star;
 mod common;
 mod day01;
 mod day02;
+mod day03;
 mod parsers;
 
 #[derive(Debug, Eq, PartialEq)]
@@ -84,6 +85,7 @@ pub fn solve_day(day: u32, data: String, aoc: &mut Aoc, submit: Option<Part>) ->
     match day {
         1 => solve::<day01::Solver>(data, aoc, submit),
         2 => solve::<day02::Solver>(data, aoc, submit),
+        3 => solve::<day03::Solver>(data, aoc, submit),
         _ => Err(failure::err_msg(format!("Invalid day {}", day))),
     }
 }
