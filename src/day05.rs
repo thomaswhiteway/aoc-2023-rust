@@ -14,22 +14,14 @@ mod parse {
         let seeds = delimited(tag("seeds: "), separated_list1(space1, unsigned), newline);
         let map_range = map(
             tuple((unsigned, space1, unsigned, space1, unsigned)),
-            |(dest_start, _, src_start, _, len)| MapRange {
-                dest_start,
-                src_start,
-                len,
-            },
+            |(dest_start, _, src_start, _, len)| MapRange::new(dest_start, src_start, len),
         );
         let item_map = map(
             tuple((
                 terminated(separated_pair(alpha1, tag("-to-"), alpha1), tag(" map:\n")),
                 many1(terminated(map_range, newline)),
             )),
-            |((source, dest), ranges)| Map {
-                source: source.to_string(),
-                dest: dest.to_string(),
-                ranges,
-            },
+            |((source, dest), ranges)| Map::new(source, dest, ranges),
         );
         let maps = map(separated_list1(newline, item_map), |maps| {
             maps.into_iter()
@@ -48,21 +40,58 @@ mod parse {
 
 use failure::Error;
 use parse::parse_input;
-use std::collections::HashMap;
+use std::cmp::{max, min};
+use std::{collections::HashMap, ops::Range};
+
+#[derive(Debug, PartialEq, Eq)]
+struct RangeMapping {
+    before: Option<Range<u64>>,
+    mapped: Option<Range<u64>>,
+    after: Option<Range<u64>>,
+}
 
 #[derive(Debug)]
 struct MapRange {
-    dest_start: u64,
-    src_start: u64,
-    len: u64,
+    dest: Range<u64>,
+    src: Range<u64>,
 }
 
 impl MapRange {
-    fn maybe_map_value(&self, value: u64) -> Option<u64> {
-        if self.src_start <= value && value < self.src_start + self.len {
-            Some(self.dest_start + (value - self.src_start))
+    fn new(dest_start: u64, src_start: u64, len: u64) -> Self {
+        MapRange {
+            dest: dest_start..dest_start + len,
+            src: src_start..src_start + len,
+        }
+    }
+
+    fn map_range(&self, range: Range<u64>) -> RangeMapping {
+        let before = if range.start < self.src.start {
+            Some(range.start..min(range.end, self.src.start))
         } else {
             None
+        };
+
+        let map_start = max(range.start, self.src.start);
+        let map_end = min(range.end, self.src.end);
+
+        let mapped = if map_start < map_end {
+            let mapped_start = self.dest.start + (map_start - self.src.start);
+            let mapped_end = self.dest.start + (map_end - self.src.start);
+            Some(mapped_start..mapped_end)
+        } else {
+            None
+        };
+
+        let after = if range.end > self.src.end {
+            Some(max(range.start, self.src.end)..range.end)
+        } else {
+            None
+        };
+
+        RangeMapping {
+            before,
+            mapped,
+            after,
         }
     }
 }
@@ -75,11 +104,37 @@ struct Map {
 }
 
 impl Map {
-    fn map_value(&self, value: u64) -> u64 {
-        self.ranges
-            .iter()
-            .find_map(|range| range.maybe_map_value(value))
-            .unwrap_or(value)
+    fn new(source: &str, dest: &str, mut ranges: Vec<MapRange>) -> Self {
+        ranges.sort_by_key(|range| range.src.start);
+        Map {
+            source: source.to_string(),
+            dest: dest.to_string(),
+            ranges,
+        }
+    }
+
+    fn map_range(&self, mut range: Range<u64>) -> Vec<Range<u64>> {
+        let mut mapped_ranges = vec![];
+
+        for map_range in &self.ranges {
+            let mapping = map_range.map_range(range.clone());
+            assert!(
+                mapping.before.is_some() || mapping.mapped.is_some() || mapping.after.is_some()
+            );
+            if let Some(before) = mapping.before {
+                mapped_ranges.push(before);
+            }
+            if let Some(mapped) = mapping.mapped {
+                mapped_ranges.push(mapped)
+            }
+            if let Some(after) = mapping.after {
+                range = after;
+            } else {
+                break;
+            }
+        }
+
+        mapped_ranges
     }
 }
 
@@ -89,25 +144,41 @@ pub struct Almanac {
 }
 
 impl Almanac {
-    fn get_locations(&self) -> Vec<u64> {
-        self.get_items(&self.seeds, "seed", "location")
+    fn get_closest_location(&self, seed_ranges: bool) -> u64 {
+        let seeds: Vec<_> = if seed_ranges {
+            self.seeds
+                .chunks(2)
+                .map(|range| range[0]..range[0] + range[1])
+                .collect()
+        } else {
+            self.seeds.iter().map(|&seed| seed..seed + 1).collect()
+        };
+        self.get_locations(&seeds)
+            .into_iter()
+            .map(|range| range.start)
+            .min()
+            .unwrap()
+    }
+
+    fn get_locations(&self, seeds: &[Range<u64>]) -> Vec<Range<u64>> {
+        self.get_items(&seeds, "seed", "location")
     }
 
     fn get_items(
         &self,
-        current_values: &[u64],
+        current_ranges: &[Range<u64>],
         current_type: &str,
         desired_type: &str,
-    ) -> Vec<u64> {
+    ) -> Vec<Range<u64>> {
         if current_type == desired_type {
-            current_values.to_vec()
+            current_ranges.to_vec()
         } else {
             let map = self.maps.get(current_type).unwrap();
-            let next_values: Vec<_> = current_values
+            let next_ranges: Vec<_> = current_ranges
                 .iter()
-                .map(|val| map.map_value(*val))
+                .flat_map(|range| map.map_range(range.clone()))
                 .collect();
-            self.get_items(&next_values, &map.dest, desired_type)
+            self.get_items(&next_ranges, &map.dest, desired_type)
         }
     }
 }
@@ -122,7 +193,8 @@ impl super::Solver for Solver {
     }
 
     fn solve(almanac: Self::Problem) -> (Option<String>, Option<String>) {
-        let part1 = almanac.get_locations().into_iter().min().unwrap();
-        (Some(part1.to_string()), None)
+        let part1 = almanac.get_closest_location(false);
+        let part2 = almanac.get_closest_location(true);
+        (Some(part1.to_string()), Some(part2.to_string()))
     }
 }
