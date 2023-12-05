@@ -64,6 +64,10 @@ impl MapRange {
         }
     }
 
+    fn map_value(&self, value: u64) -> u64 {
+        self.dest.start + (value - self.src.start)
+    }
+
     fn map_range(&self, range: Range<u64>) -> RangeMapping {
         let before = if range.start < self.src.start {
             Some(range.start..min(range.end, self.src.start))
@@ -75,8 +79,8 @@ impl MapRange {
         let map_end = min(range.end, self.src.end);
 
         let mapped = if map_start < map_end {
-            let mapped_start = self.dest.start + (map_start - self.src.start);
-            let mapped_end = self.dest.start + (map_end - self.src.start);
+            let mapped_start = self.map_value(map_start);
+            let mapped_end = self.map_value(map_end);
             Some(mapped_start..mapped_end)
         } else {
             None
@@ -87,6 +91,8 @@ impl MapRange {
         } else {
             None
         };
+
+        assert!(before.is_some() || mapped.is_some() || after.is_some());
 
         RangeMapping {
             before,
@@ -118,9 +124,6 @@ impl Map {
 
         for map_range in &self.ranges {
             let mapping = map_range.map_range(range.clone());
-            assert!(
-                mapping.before.is_some() || mapping.mapped.is_some() || mapping.after.is_some()
-            );
             if let Some(before) = mapping.before {
                 mapped_ranges.push(before);
             }
@@ -144,15 +147,19 @@ pub struct Almanac {
 }
 
 impl Almanac {
-    fn get_closest_location(&self, seed_ranges: bool) -> u64 {
-        let seeds: Vec<_> = if seed_ranges {
+    fn get_seeds(&self, seed_ranges: bool) -> Vec<Range<u64>> {
+        if seed_ranges {
             self.seeds
                 .chunks(2)
                 .map(|range| range[0]..range[0] + range[1])
                 .collect()
         } else {
             self.seeds.iter().map(|&seed| seed..seed + 1).collect()
-        };
+        }
+    }
+
+    fn get_closest_location(&self, seed_ranges: bool) -> u64 {
+        let seeds = self.get_seeds(seed_ranges);
         self.get_locations(&seeds)
             .into_iter()
             .map(|range| range.start)
