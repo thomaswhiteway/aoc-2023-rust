@@ -40,7 +40,7 @@ fn find_numbers(grid: &HashMap<Position, char>) -> Vec<(u64, HashSet<Position>)>
 fn find_positions_near_symbols(grid: &HashMap<Position, char>) -> HashSet<Position> {
     grid.iter()
         .filter_map(|(pos, c)| {
-            if !c.is_digit(10) && *c != '.' {
+            if !c.is_ascii_digit() && *c != '.' {
                 Some(pos)
             } else {
                 None
@@ -55,7 +55,7 @@ fn is_part_number(pos: &Position, near_symbols: &HashSet<Position>) -> bool {
 }
 
 fn find_part_numbers(grid: &HashMap<Position, char>) -> Vec<u64> {
-    let near_symbols = find_positions_near_symbols(&grid);
+    let near_symbols = find_positions_near_symbols(grid);
     find_numbers(grid)
         .into_iter()
         .filter_map(|(num, positions)| {

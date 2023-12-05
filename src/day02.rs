@@ -75,7 +75,7 @@ fn is_game_possible(rounds: &[[usize; 3]], candidate: &[usize; 3]) -> bool {
         .all(|round| is_round_possible(round, candidate))
 }
 
-fn game_min_cubes(rounds: &Vec<[usize; 3]>) -> [usize; 3] {
+fn game_min_cubes(rounds: &[[usize; 3]]) -> [usize; 3] {
     rounds
         .iter()
         .fold(vec![0, 0, 0], |current, round| {
@@ -104,7 +104,7 @@ impl super::Solver for Solver {
         let part1: usize = (1..)
             .zip(games.iter())
             .filter_map(|(game_id, game)| {
-                if is_game_possible(&game, &candidate) {
+                if is_game_possible(game, &candidate) {
                     Some(game_id)
                 } else {
                     None
@@ -114,6 +114,7 @@ impl super::Solver for Solver {
 
         let part2: usize = games
             .iter()
+            .map(Vec::as_slice)
             .map(game_min_cubes)
             .map(|min_cubes| min_cubes.iter().product::<usize>())
             .sum();

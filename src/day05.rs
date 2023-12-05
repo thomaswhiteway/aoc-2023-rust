@@ -168,7 +168,7 @@ impl Almanac {
     }
 
     fn get_locations(&self, seeds: &[Range<u64>]) -> Vec<Range<u64>> {
-        self.get_items(&seeds, "seed", "location")
+        self.get_items(seeds, "seed", "location")
     }
 
     fn get_items(
