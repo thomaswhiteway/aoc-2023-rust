@@ -22,13 +22,13 @@ enum HandType {
 
 impl PartialOrd for HandType {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        (*self as u8).partial_cmp(&(*other as u8))
+        Some(self.cmp(other))
     }
 }
 
 impl Ord for HandType {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.partial_cmp(other).unwrap()
+        (*self as u8).cmp(&(*other as u8))
     }
 }
 
@@ -38,10 +38,28 @@ pub struct Hand {
     bid: u64,
 }
 
+fn is_joker(card: u8) -> bool {
+    card == 0
+}
+
 impl Hand {
     fn hand_type(&self) -> HandType {
-        let mut counts: Vec<_> = self.cards.iter().counts().into_values().collect();
+        let num_jokers = self.cards.iter().filter(|card| is_joker(**card)).count();
+
+        let mut counts: Vec<_> = self
+            .cards
+            .iter()
+            .filter(|card| !is_joker(**card))
+            .counts()
+            .into_values()
+            .collect();
         counts.sort_by(|x, y| x.cmp(y).reverse());
+
+        if !counts.is_empty() {
+            counts[0] += num_jokers;
+        } else {
+            counts.push(num_jokers);
+        }
 
         use HandType::*;
         if counts[0] == 5 {
@@ -60,26 +78,45 @@ impl Hand {
             HighCard
         }
     }
+
+    fn with_jokers(&self) -> Self {
+        let cards = self
+            .cards
+            .iter()
+            .map(|&card| if card == 11 { 0 } else { card })
+            .collect();
+        Hand {
+            cards,
+            bid: self.bid,
+        }
+    }
 }
 
 impl PartialOrd for Hand {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(
-            self.hand_type()
-                .cmp(&other.hand_type())
-                .then(self.cards.cmp(&other.cards)),
-        )
+        Some(self.cmp(other))
     }
 }
 
 impl Ord for Hand {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.partial_cmp(other).unwrap()
+        self.hand_type()
+            .cmp(&other.hand_type())
+            .then(self.cards.cmp(&other.cards))
     }
 }
 
-fn find_total_winnings(hands: &[Hand]) -> u64 {
-    let mut hands = hands.to_vec();
+fn find_total_winnings(hands: &[Hand], jokers: bool) -> u64 {
+    let mut hands: Vec<_> = hands
+        .iter()
+        .map(|hand| {
+            if jokers {
+                hand.with_jokers()
+            } else {
+                hand.clone()
+            }
+        })
+        .collect();
     hands.sort();
 
     (1..).zip(hands).map(|(rank, hand)| hand.bid * rank).sum()
@@ -114,7 +151,9 @@ impl super::Solver for Solver {
     }
 
     fn solve(hands: Self::Problem) -> (Option<String>, Option<String>) {
-        let part1 = find_total_winnings(&hands);
-        (Some(part1.to_string()), None)
+        let part1 = find_total_winnings(&hands, false);
+        let part2 = find_total_winnings(&hands, true);
+
+        (Some(part1.to_string()), Some(part2.to_string()))
     }
 }

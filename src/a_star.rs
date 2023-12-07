@@ -11,13 +11,13 @@ struct Priority(u64);
 
 impl PartialOrd for Priority {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.0.cmp(&other.0).reverse())
+        Some(self.cmp(other))
     }
 }
 
 impl Ord for Priority {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.partial_cmp(other).unwrap()
+        self.0.cmp(&other.0).reverse()
     }
 }
 
