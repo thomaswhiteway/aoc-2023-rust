@@ -1,7 +1,7 @@
 use crate::common::{Direction, Position};
 use failure::{err_msg, Error};
 use itertools::Itertools;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 #[derive(Debug, Copy, Clone)]
 pub struct Pipe {
@@ -24,6 +24,11 @@ impl Pipe {
             None
         }
     }
+
+    fn is_vertical(&self) -> bool {
+        use Direction::*;
+        self.directions == [North, South] || self.directions == [South, North]
+    }
 }
 
 impl TryFrom<char> for Pipe {
@@ -43,38 +48,116 @@ impl TryFrom<char> for Pipe {
     }
 }
 
-fn find_furthest_distance(start: Position, pipes: &HashMap<Position, Pipe>) -> usize {
-    let mut current: Vec<_> = Direction::all().map(|dir| (start, dir)).collect();
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ScanState {
+    OffPipe(bool),
+    OnPipe(Direction, bool),
+}
 
-    for distance in 1.. {
-        let next: Vec<_> = current
-            .iter()
-            .filter_map(|(pos, dir)| {
-                let next_pos = pos.step(*dir);
-                pipes
-                    .get(&next_pos)
-                    .and_then(|pipe| pipe.new_dir(*dir))
-                    .map(|new_dir| (next_pos, new_dir))
-            })
-            .collect();
+fn find_loop(start: Position, pipes: &mut HashMap<Position, Pipe>) -> HashSet<Position> {
+    let mut current: Vec<_> = Direction::all().map(|dir| (vec![start], dir)).collect();
 
-        assert!(next.len() > 1);
+    loop {
+        current.retain_mut(|(route, dir)| {
+            let next_pos = route.last().unwrap().step(*dir);
+            if let Some(next_dir) = pipes.get(&next_pos).and_then(|pipe| pipe.new_dir(*dir)) {
+                route.push(next_pos);
+                *dir = next_dir;
+                true
+            } else {
+                false
+            }
+        });
 
-        if !next.iter().map(|(pos, _)| pos).all_unique() {
-            return distance;
+        assert!(current.len() > 1);
+
+        for i in 0..current.len() {
+            let this_route = &current[i].0;
+            for (other_route, _) in current.iter().skip(i+1) {
+                if this_route.last().unwrap() == other_route.last().unwrap() {
+                    pipes.insert(
+                        start,
+                        Pipe::new(
+                            start.direction_to(&this_route[1]).unwrap(),
+                            start.direction_to(&other_route[1]).unwrap(),
+                        ),
+                    );
+
+                    return this_route
+                        .iter()
+                        .chain(other_route.iter())
+                        .cloned()
+                        .collect();
+                }
+            }
         }
+    }
+}
 
-        if next
-            .iter()
-            .any(|(pos, _)| current.iter().any(|(prev_pos, _)| pos == prev_pos))
-        {
-            return distance - 1;
+fn find_furthest_distance(pipe_loop: &HashSet<Position>) -> usize {
+    pipe_loop.len() / 2
+}
+
+fn find_spaces_inside(pipes: &HashMap<Position, Pipe>, pipe_loop: &HashSet<Position>) -> usize {
+    use Direction::*;
+    use ScanState::*;
+
+    let mut total = 0;
+
+    let (min_x, max_x) = pipes
+        .keys()
+        .map(|pos| pos.x)
+        .minmax()
+        .into_option()
+        .unwrap();
+    let (min_y, max_y) = pipes
+        .keys()
+        .map(|pos| pos.y)
+        .minmax()
+        .into_option()
+        .unwrap();
+
+    for y in min_y..=max_y {
+        let mut state = OffPipe(false);
+
+        for x in min_x..=max_x {
+            let pos = Position { x, y };
+            if pipe_loop.contains(&pos) {
+                let pipe = pipes.get(&pos).unwrap();
+
+                state = match state {
+                    OffPipe(inside) => {
+                        if pipe.is_vertical() {
+                            OffPipe(!inside)
+                        } else {
+                            OnPipe(pipe.new_dir(West).unwrap(), inside)
+                        }
+                    }
+                    OnPipe(dir, inside) => match pipe.new_dir(East).unwrap() {
+                        East => state,
+                        other => {
+                            assert!(other != East);
+                            if other != dir {
+                                OffPipe(!inside)
+                            } else {
+                                OffPipe(inside)
+                            }
+                        }
+                    },
+                }
+            } else {
+                match state {
+                    OffPipe(true) => {
+                        total += 1;
+                    }
+                    OffPipe(_) => {}
+                    _ => unreachable!(),
+                }
+            }
         }
-
-        current = next;
     }
 
-    unreachable!()
+    total
 }
 
 pub struct Solver {}
@@ -98,7 +181,7 @@ impl super::Solver for Solver {
                     }
                 })
             })
-            .ok_or(err_msg(format!("Failed to find start position")))?;
+            .ok_or(err_msg("Failed to find start position"))?;
 
         let pipes = data
             .lines()
@@ -121,8 +204,11 @@ impl super::Solver for Solver {
         Ok((start, pipes))
     }
 
-    fn solve((start, pipes): Self::Problem) -> (Option<String>, Option<String>) {
-        let part1 = find_furthest_distance(start, &pipes);
-        (Some(part1.to_string()), None)
+    fn solve((start, mut pipes): Self::Problem) -> (Option<String>, Option<String>) {
+        let pipe_loop = find_loop(start, &mut pipes);
+
+        let part1 = find_furthest_distance(&pipe_loop);
+        let part2 = find_spaces_inside(&pipes, &pipe_loop);
+        (Some(part1.to_string()), Some(part2.to_string()))
     }
 }
