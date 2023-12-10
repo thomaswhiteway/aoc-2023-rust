@@ -57,6 +57,10 @@ impl Position {
         let delta = diff / distance;
         (0..distance).map(move |index| self + delta * index)
     }
+
+    pub fn step(self, direction: Direction) -> Self {
+        self + direction.offset()
+    }
 }
 
 impl From<(i64, i64)> for Position {
@@ -126,6 +130,26 @@ impl Direction {
             East => '>',
             South => 'V',
             West => '<',
+        }
+    }
+
+    pub fn offset(self) -> Position {
+        use Direction::*;
+        match self {
+            North => Position { x: 0, y: -1 },
+            East => Position { x: 1, y: 0 },
+            South => Position { x: 0, y: 1 },
+            West => Position { x: -1, y: 0 },
+        }
+    }
+
+    pub fn reverse(self) -> Direction {
+        use Direction::*;
+        match self {
+            North => South,
+            East => West,
+            South => North,
+            West => East,
         }
     }
 }
