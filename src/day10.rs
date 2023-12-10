@@ -25,9 +25,8 @@ impl Pipe {
         }
     }
 
-    fn is_vertical(&self) -> bool {
-        use Direction::*;
-        self.directions == [North, South] || self.directions == [South, North]
+    fn has_direction(self, dir: Direction) -> bool {
+        self.directions.contains(&dir)
     }
 }
 
@@ -46,12 +45,6 @@ impl TryFrom<char> for Pipe {
             _ => Err(()),
         }
     }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum ScanState {
-    OffPipe(bool),
-    OnPipe(Direction, bool),
 }
 
 fn find_loop(start: Position, pipes: &mut HashMap<Position, Pipe>) -> HashSet<Position> {
@@ -73,7 +66,7 @@ fn find_loop(start: Position, pipes: &mut HashMap<Position, Pipe>) -> HashSet<Po
 
         for i in 0..current.len() {
             let this_route = &current[i].0;
-            for (other_route, _) in current.iter().skip(i+1) {
+            for (other_route, _) in current.iter().skip(i + 1) {
                 if this_route.last().unwrap() == other_route.last().unwrap() {
                     pipes.insert(
                         start,
@@ -100,7 +93,6 @@ fn find_furthest_distance(pipe_loop: &HashSet<Position>) -> usize {
 
 fn find_spaces_inside(pipes: &HashMap<Position, Pipe>, pipe_loop: &HashSet<Position>) -> usize {
     use Direction::*;
-    use ScanState::*;
 
     let mut total = 0;
 
@@ -118,41 +110,16 @@ fn find_spaces_inside(pipes: &HashMap<Position, Pipe>, pipe_loop: &HashSet<Posit
         .unwrap();
 
     for y in min_y..=max_y {
-        let mut state = OffPipe(false);
+        let mut num_north = 0;
 
         for x in min_x..=max_x {
             let pos = Position { x, y };
             if pipe_loop.contains(&pos) {
-                let pipe = pipes.get(&pos).unwrap();
-
-                state = match state {
-                    OffPipe(inside) => {
-                        if pipe.is_vertical() {
-                            OffPipe(!inside)
-                        } else {
-                            OnPipe(pipe.new_dir(West).unwrap(), inside)
-                        }
-                    }
-                    OnPipe(dir, inside) => match pipe.new_dir(East).unwrap() {
-                        East => state,
-                        other => {
-                            assert!(other != East);
-                            if other != dir {
-                                OffPipe(!inside)
-                            } else {
-                                OffPipe(inside)
-                            }
-                        }
-                    },
+                if pipes.get(&pos).unwrap().has_direction(North) {
+                    num_north += 1;
                 }
-            } else {
-                match state {
-                    OffPipe(true) => {
-                        total += 1;
-                    }
-                    OffPipe(_) => {}
-                    _ => unreachable!(),
-                }
+            } else if num_north % 2 == 1 {
+                total += 1;
             }
         }
     }
