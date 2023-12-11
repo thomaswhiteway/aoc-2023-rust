@@ -2,7 +2,7 @@ use crate::common::Position;
 use failure::Error;
 use itertools::Itertools;
 
-fn get_total_lengths(galaxies: &Vec<Position>) -> usize {
+fn get_total_lengths(galaxies: &Vec<Position>, expansion: usize) -> usize {
     let mut total = 0;
 
     let (min_x, max_x) = galaxies
@@ -19,7 +19,7 @@ fn get_total_lengths(galaxies: &Vec<Position>) -> usize {
         let num_in_col = galaxies.iter().filter(|pos| pos.x == x).count();
 
         if num_in_col == 0 {
-            total += 2 * right * left;
+            total += expansion * right * left;
         } else {
             total += right * left;
             right -= num_in_col;
@@ -40,7 +40,7 @@ fn get_total_lengths(galaxies: &Vec<Position>) -> usize {
         let num_in_row = galaxies.iter().filter(|pos| pos.y == y).count();
 
         if num_in_row == 0 {
-            total += 2 * below * above;
+            total += expansion * below * above;
         } else {
             total += below * above;
             below -= num_in_row;
@@ -76,7 +76,8 @@ impl super::Solver for Solver {
     }
 
     fn solve(galaxies: Self::Problem) -> (Option<String>, Option<String>) {
-        let part1 = get_total_lengths(&galaxies);
-        (Some(part1.to_string()), None)
+        let part1 = get_total_lengths(&galaxies, 2);
+        let part2 = get_total_lengths(&galaxies, 1000000);
+        (Some(part1.to_string()), Some(part2.to_string()))
     }
 }
