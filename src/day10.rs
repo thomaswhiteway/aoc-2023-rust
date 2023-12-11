@@ -73,7 +73,7 @@ fn find_loop(start: Position, pipes: &mut HashMap<Position, Pipe>) -> HashSet<Po
 
         for i in 0..current.len() {
             let this_route = &current[i].0;
-            for (other_route, _) in current.iter().skip(i+1) {
+            for (other_route, _) in current.iter().skip(i + 1) {
                 if this_route.last().unwrap() == other_route.last().unwrap() {
                     pipes.insert(
                         start,
