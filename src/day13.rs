@@ -1,7 +1,7 @@
 use failure::Error;
 use std::str::FromStr;
 
-fn find_reflection(entries: &[String]) -> Option<usize> {
+fn find_reflection(entries: &[String], num_change: usize) -> Option<usize> {
     let mut before: Vec<&str> = vec![];
     let mut after: Vec<&str> = entries.iter().rev().map(String::as_str).collect();
 
@@ -10,7 +10,9 @@ fn find_reflection(entries: &[String]) -> Option<usize> {
             .iter()
             .rev()
             .zip(after.iter().rev())
-            .any(|(x, y)| x != y)
+            .map(|(xs, ys)| xs.chars().zip(ys.chars()).filter(|(x, y)| x != y).count())
+            .sum::<usize>()
+            != num_change
     {
         if let Some(next) = after.pop() {
             before.push(next)
@@ -31,7 +33,7 @@ pub struct Grid {
 }
 
 impl Grid {
-    fn cols_before_reflection(&self) -> Option<usize> {
+    fn cols_before_reflection(&self, num_change: usize) -> Option<usize> {
         let cols: Vec<_> = (0..self.rows[0].len())
             .map(|y| {
                 self.rows
@@ -40,11 +42,11 @@ impl Grid {
                     .collect()
             })
             .collect();
-        find_reflection(&cols)
+        find_reflection(&cols, num_change)
     }
 
-    fn rows_before_reflection(&self) -> Option<usize> {
-        find_reflection(&self.rows)
+    fn rows_before_reflection(&self, num_change: usize) -> Option<usize> {
+        find_reflection(&self.rows, num_change)
     }
 }
 
@@ -70,11 +72,20 @@ impl super::Solver for Solver {
         let part1: usize = grids
             .iter()
             .map(|grid| {
-                grid.cols_before_reflection()
-                    .or_else(|| grid.rows_before_reflection().map(|rows| 100 * rows))
+                grid.cols_before_reflection(0)
+                    .or_else(|| grid.rows_before_reflection(0).map(|rows| 100 * rows))
                     .unwrap()
             })
             .sum();
-        (Some(part1.to_string()), None)
+        let part2: usize = grids
+            .iter()
+            .map(|grid| {
+                grid.cols_before_reflection(1)
+                    .or_else(|| grid.rows_before_reflection(1).map(|rows| 100 * rows))
+                    .unwrap()
+            })
+            .sum();
+
+        (Some(part1.to_string()), Some(part2.to_string()))
     }
 }
