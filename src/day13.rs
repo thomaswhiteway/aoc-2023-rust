@@ -1,35 +1,27 @@
 use failure::Error;
 use std::str::FromStr;
 
-fn find_reflection(entries: &[String], num_change: usize) -> Option<usize> {
-    let mut before: Vec<&str> = vec![];
-    let mut after: Vec<&str> = entries.iter().rev().map(String::as_str).collect();
+fn find_reflection<T: Eq>(entries: &[Vec<T>], num_change: usize) -> Option<usize> {
+    let mut before: Vec<&Vec<T>> = vec![];
+    let mut after: Vec<&Vec<T>> = entries.iter().rev().collect();
 
-    while before.is_empty()
-        || before
-            .iter()
-            .rev()
-            .zip(after.iter().rev())
-            .map(|(xs, ys)| xs.chars().zip(ys.chars()).filter(|(x, y)| x != y).count())
-            .sum::<usize>()
-            != num_change
-    {
-        if let Some(next) = after.pop() {
-            before.push(next)
-        } else {
-            return None;
+    while after.len() > 1 {
+        before.push(after.pop().unwrap());
+
+        let num_different: usize = before.iter().rev().zip(after.iter().rev()).map(|(before_row, after_row)|
+            before_row.iter().zip(after_row.iter()).filter(|(b, a)| b != a).count()
+        ).sum();
+
+        if num_different == num_change {
+            return Some(before.len());
         }
     }
 
-    if !after.is_empty() {
-        Some(before.len())
-    } else {
-        None
-    }
+    None
 }
 
 pub struct Grid {
-    rows: Vec<String>,
+    rows: Vec<Vec<bool>>,
 }
 
 impl Grid {
@@ -38,7 +30,7 @@ impl Grid {
             .map(|y| {
                 self.rows
                     .iter()
-                    .map(|row| row.chars().nth(y).unwrap())
+                    .map(|row| row[y])
                     .collect()
             })
             .collect();
@@ -54,7 +46,7 @@ impl FromStr for Grid {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let rows = s.lines().map(|line| line.chars().collect()).collect();
+        let rows = s.lines().map(|line| line.chars().map(|c| c == '#').collect()).collect();
         Ok(Grid { rows })
     }
 }
