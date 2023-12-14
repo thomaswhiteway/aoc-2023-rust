@@ -8,9 +8,18 @@ fn find_reflection<T: Eq>(entries: &[Vec<T>], num_change: usize) -> Option<usize
     while after.len() > 1 {
         before.push(after.pop().unwrap());
 
-        let num_different: usize = before.iter().rev().zip(after.iter().rev()).map(|(before_row, after_row)|
-            before_row.iter().zip(after_row.iter()).filter(|(b, a)| b != a).count()
-        ).sum();
+        let num_different: usize = before
+            .iter()
+            .rev()
+            .zip(after.iter().rev())
+            .map(|(before_row, after_row)| {
+                before_row
+                    .iter()
+                    .zip(after_row.iter())
+                    .filter(|(b, a)| b != a)
+                    .count()
+            })
+            .sum();
 
         if num_different == num_change {
             return Some(before.len());
@@ -27,12 +36,7 @@ pub struct Grid {
 impl Grid {
     fn cols_before_reflection(&self, num_change: usize) -> Option<usize> {
         let cols: Vec<_> = (0..self.rows[0].len())
-            .map(|y| {
-                self.rows
-                    .iter()
-                    .map(|row| row[y])
-                    .collect()
-            })
+            .map(|y| self.rows.iter().map(|row| row[y]).collect())
             .collect();
         find_reflection(&cols, num_change)
     }
@@ -46,7 +50,10 @@ impl FromStr for Grid {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let rows = s.lines().map(|line| line.chars().map(|c| c == '#').collect()).collect();
+        let rows = s
+            .lines()
+            .map(|line| line.chars().map(|c| c == '#').collect())
+            .collect();
         Ok(Grid { rows })
     }
 }
