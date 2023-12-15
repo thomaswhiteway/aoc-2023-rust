@@ -1,3 +1,4 @@
+#![allow(unused)]
 use nom::{
     bytes::complete::{tag, take_while1},
     character::complete::digit1,

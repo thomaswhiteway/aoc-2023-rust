@@ -1,3 +1,4 @@
+#![allow(unused)]
 use priority_queue::PriorityQueue;
 use std::{collections::HashSet, fmt::Debug, hash::Hash};
 
