@@ -61,6 +61,10 @@ impl Position {
     pub fn step(self, direction: Direction) -> Self {
         self + direction.offset()
     }
+
+    pub fn origin() -> Self {
+        Position { x: 0, y: 0 }
+    }
 }
 
 impl From<(i64, i64)> for Position {
@@ -118,7 +122,7 @@ impl Mul<i64> for Position {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Direction {
     North,
     East,
