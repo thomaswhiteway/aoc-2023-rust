@@ -165,4 +165,24 @@ impl Direction {
             West => East,
         }
     }
+
+    pub fn turn_left(self) -> Direction {
+        use Direction::*;
+        match self {
+            North => West,
+            East => North,
+            South => East,
+            West => South,
+        }
+    }
+
+    pub fn turn_right(self) -> Direction {
+        use Direction::*;
+        match self {
+            North => East,
+            East => South,
+            South => West,
+            West => North,
+        }
+    }
 }
