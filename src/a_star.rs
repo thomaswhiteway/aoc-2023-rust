@@ -49,23 +49,30 @@ impl<S: State> Hash for Entry<S> {
     }
 }
 
-pub fn solve<S: State + Clone + Debug>(start: S) -> Result<(u64, Vec<S>), HashSet<S>>
+pub struct Solution<S> {
+    pub cost: u64,
+    pub route: Vec<S>,
+}
 
-{
+pub fn solve<S: State + Clone + Debug>(
+    starts: impl Iterator<Item = S>,
+) -> Result<Solution<S>, HashSet<S>> {
     let mut queue = PriorityQueue::new();
-    let entry = Entry {
-        cost: 0,
-        state: start.clone(),
-        route: vec![start],
-    };
-    let priority = entry.priority();
-    queue.push(entry, priority);
+    for start in starts {
+        let entry = Entry {
+            cost: 0,
+            state: start.clone(),
+            route: vec![start],
+        };
+        let priority = entry.priority();
+        queue.push(entry, priority);
+    }
 
     let mut visited = HashSet::new();
 
     while let Some((Entry { cost, state, route }, _)) = queue.pop() {
         if state.is_end() {
-            return Ok((cost, route));
+            return Ok(Solution { cost, route });
         }
 
         visited.insert(state.clone());
