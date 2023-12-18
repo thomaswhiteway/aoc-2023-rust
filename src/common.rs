@@ -1,7 +1,10 @@
 #![allow(unused)]
 
 use itertools::iproduct;
-use std::ops::{Add, Div, Mul, Sub};
+use std::{
+    fmt::Display,
+    ops::{Add, Div, Mul, Sub},
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct Position {
@@ -38,10 +41,10 @@ impl Position {
 
     pub fn direction_to(&self, other: &Self) -> Option<Direction> {
         match (other.x - self.x, other.y - self.y) {
-            (0, -1) => Some(Direction::North),
-            (1, 0) => Some(Direction::East),
-            (0, 1) => Some(Direction::South),
-            (-1, 0) => Some(Direction::West),
+            (0, dy) if dy < 0 => Some(Direction::North),
+            (dx, 0) if dx > 0 => Some(Direction::East),
+            (0, dy) if dy > 0 => Some(Direction::South),
+            (dx, 0) if dx < 0 => Some(Direction::West),
             _ => None,
         }
     }
@@ -60,6 +63,10 @@ impl Position {
 
     pub fn step(self, direction: Direction) -> Self {
         self + direction.offset()
+    }
+
+    pub fn step_by(self, direction: Direction, len: u32) -> Self {
+        self + direction.offset() * len as i64
     }
 
     pub fn origin() -> Self {
@@ -119,6 +126,12 @@ impl Mul<i64> for Position {
             x: self.x * rhs,
             y: self.y * rhs,
         }
+    }
+}
+
+impl Display for Position {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({}, {})", self.x, self.y)
     }
 }
 
