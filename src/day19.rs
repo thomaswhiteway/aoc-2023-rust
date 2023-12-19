@@ -118,6 +118,10 @@ use std::collections::HashMap;
 
 use failure::Error;
 use parse::parse_input;
+use std::{
+    cmp::{max, min},
+    ops::Range,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Comparison {
@@ -131,6 +135,38 @@ impl Comparison {
         match self {
             LessThan => left < right,
             MoreThan => left > right,
+        }
+    }
+
+    fn split(self, range: &Range<u64>, value: u64) -> (Option<Range<u64>>, Option<Range<u64>>) {
+        use Comparison::*;
+        match self {
+            LessThan => {
+                let matched: Option<Range<u64>> = if range.start < value {
+                    Some(range.start..min(value, range.end))
+                } else {
+                    None
+                };
+                let unmatched = if range.end > value {
+                    Some(max(value, range.start)..range.end)
+                } else {
+                    None
+                };
+                (matched, unmatched)
+            }
+            MoreThan => {
+                let matched: Option<Range<u64>> = if range.end > value + 1 {
+                    Some(max(range.start, value + 1)..range.end)
+                } else {
+                    None
+                };
+                let unmatched = if range.start <= value {
+                    Some(range.start..min(value + 1, range.end))
+                } else {
+                    None
+                };
+                (matched, unmatched)
+            }
         }
     }
 }
@@ -161,6 +197,15 @@ impl Condition {
     fn matches(&self, part: &Part) -> bool {
         self.comparison.apply(part.value(self.category), self.value)
     }
+
+    fn split(&self, range: &PartRange) -> (Option<PartRange>, Option<PartRange>) {
+        let category_range = range.category_range(self.category);
+        let (matched, unmatched) = self.comparison.split(category_range, self.value);
+        (
+            matched.map(|matched_range| range.update(self.category, matched_range)),
+            unmatched.map(|unmatched_range| range.update(self.category, unmatched_range)),
+        )
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -181,6 +226,18 @@ impl Rule {
             None
         }
     }
+
+    fn split(&self, range: &PartRange) -> (Option<(PartRange, &Outcome)>, Option<PartRange>) {
+        if let Some(condition) = self.condition {
+            let (matches, doesnt_match) = condition.split(range);
+            (
+                matches.map(|matches| (matches, &self.outcome)),
+                doesnt_match,
+            )
+        } else {
+            (Some((range.clone(), &self.outcome)), None)
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -192,6 +249,22 @@ pub struct Workflow {
 impl Workflow {
     fn outcome(&self, part: &Part) -> Option<&Outcome> {
         self.rules.iter().find_map(|rule| rule.get_outcome(part))
+    }
+
+    fn split(&self, range: PartRange) -> impl Iterator<Item = (PartRange, &Outcome)> + '_ {
+        self.rules
+            .iter()
+            .scan(Some(range), |current_range, rule| {
+                if let Some(range) = current_range.clone() {
+                    let (match_range, remaining_range) = rule.split(&range);
+                    *current_range = remaining_range;
+
+                    Some(match_range)
+                } else {
+                    None
+                }
+            })
+            .flatten()
     }
 }
 
@@ -213,6 +286,7 @@ impl Part {
             Shiny => self.shiny,
         }
     }
+
     fn field_mut(&mut self, category: Category) -> &mut u64 {
         use Category::*;
         match category {
@@ -255,6 +329,79 @@ impl Part {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct PartRange {
+    cool: Range<u64>,
+    musical: Range<u64>,
+    aerodynamic: Range<u64>,
+    shiny: Range<u64>,
+}
+
+impl PartRange {
+    fn full() -> Self {
+        PartRange {
+            cool: 1..4001,
+            musical: 1..4001,
+            aerodynamic: 1..4001,
+            shiny: 1..4001,
+        }
+    }
+
+    fn split(self, workflows: &HashMap<String, Workflow>) -> Vec<(PartRange, bool)> {
+        let mut results = vec![];
+        let mut to_split = vec![("in".to_string(), self)];
+
+        while let Some((workflow_name, part_range)) = to_split.pop() {
+            let workflow = workflows
+                .get(&workflow_name)
+                .unwrap_or_else(|| panic!("Failed to find workflow: {}", workflow_name));
+
+            for (range, outcome) in workflow.split(part_range) {
+                match outcome {
+                    Outcome::Accept => results.push((range, true)),
+                    Outcome::Reject => results.push((range, false)),
+                    Outcome::Jump(name) => to_split.push((name.clone(), range)),
+                }
+            }
+        }
+
+        results
+    }
+
+    fn category_range(&self, category: Category) -> &Range<u64> {
+        use Category::*;
+        match category {
+            Cool => &self.cool,
+            Musical => &self.musical,
+            Aerodynamic => &self.aerodynamic,
+            Shiny => &self.shiny,
+        }
+    }
+
+    fn category_range_mut(&mut self, category: Category) -> &mut Range<u64> {
+        use Category::*;
+        match category {
+            Cool => &mut self.cool,
+            Musical => &mut self.musical,
+            Aerodynamic => &mut self.aerodynamic,
+            Shiny => &mut self.shiny,
+        }
+    }
+
+    fn update(&self, category: Category, range: Range<u64>) -> Self {
+        let mut updated = self.clone();
+        *updated.category_range_mut(category) = range;
+        updated
+    }
+
+    fn size(&self) -> u64 {
+        [&self.cool, &self.musical, &self.aerodynamic, &self.shiny]
+            .into_iter()
+            .map(|range| range.end - range.start)
+            .product()
+    }
+}
+
 pub struct Solver {}
 
 impl super::Solver for Solver {
@@ -270,6 +417,12 @@ impl super::Solver for Solver {
             .filter(|part| part.is_accepted(&workflows))
             .map(|part| part.total())
             .sum();
-        (Some(part1.to_string()), None)
+
+        let part2: u64 = PartRange::full()
+            .split(&workflows)
+            .into_iter()
+            .filter_map(|(range, accepted)| if accepted { Some(range.size()) } else { None })
+            .sum();
+        (Some(part1.to_string()), Some(part2.to_string()))
     }
 }
