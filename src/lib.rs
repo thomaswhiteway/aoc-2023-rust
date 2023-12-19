@@ -24,6 +24,7 @@ mod day15;
 mod day16;
 mod day17;
 mod day18;
+mod day19;
 mod parsers;
 
 #[derive(Debug, Eq, PartialEq)]
@@ -116,6 +117,7 @@ pub fn solve_day(day: u32, data: String, aoc: &mut Aoc, submit: Option<Part>) ->
         16 => solve::<day16::Solver>(data, aoc, submit),
         17 => solve::<day17::Solver>(data, aoc, submit),
         18 => solve::<day18::Solver>(data, aoc, submit),
+        19 => solve::<day19::Solver>(data, aoc, submit),
         _ => Err(failure::err_msg(format!("Invalid day {}", day))),
     }
 }
