@@ -1,4 +1,5 @@
 use failure::{err_msg, Error};
+use itertools::Itertools;
 use nom::{
     branch::alt,
     bytes::complete::tag,
@@ -8,7 +9,10 @@ use nom::{
     sequence::{separated_pair, terminated, tuple},
     IResult,
 };
-use std::collections::{HashMap, VecDeque};
+use std::{
+    collections::{HashMap, VecDeque},
+    fmt::Display,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Pulse {
@@ -16,15 +20,31 @@ enum Pulse {
     Low,
 }
 
+impl Display for Pulse {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Pulse::High => write!(f, "1"),
+            Pulse::Low => write!(f, "0"),
+        }
+    }
+}
+
 trait PulseHandler {
     fn handle_pulse(&mut self, pulse: Pulse, source: &str) -> Option<Pulse>;
     fn add_source(&mut self, _source: &str) {}
 }
 
+#[derive(Debug, Clone)]
 pub struct Module {
     name: String,
     handler: ModuleHandler,
     output: Vec<String>,
+}
+
+impl Display for Module {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}:{}", self.name, self.handler)
+    }
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -39,6 +59,16 @@ impl PulseHandler for FlipFlop {
             Some(if self.on { Pulse::High } else { Pulse::Low })
         } else {
             None
+        }
+    }
+}
+
+impl Display for FlipFlop {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.on {
+            write!(f, "1")
+        } else {
+            write!(f, "0")
         }
     }
 }
@@ -67,6 +97,22 @@ impl PulseHandler for Conjunction {
     }
 }
 
+impl Display for Conjunction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut first = true;
+        for pulse in self.last_pulse.values() {
+            if !first {
+                write!(f, ",")?
+            }
+            first = false;
+
+            write!(f, "{}", pulse)?
+        }
+
+        Ok(())
+    }
+}
+
 #[derive(Debug, Clone, Copy, Default)]
 struct Broadcast {}
 
@@ -81,6 +127,16 @@ enum ModuleHandler {
     FlipFlop(FlipFlop),
     Conjunction(Conjunction),
     Broadcast(Broadcast),
+}
+
+impl Display for ModuleHandler {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ModuleHandler::FlipFlop(flipflop) => write!(f, "FlipFlop({})", flipflop),
+            ModuleHandler::Conjunction(conjunction) => write!(f, "Conjunction({})", conjunction),
+            ModuleHandler::Broadcast(_) => write!(f, "Broadcast()"),
+        }
+    }
 }
 
 impl PulseHandler for ModuleHandler {
@@ -171,6 +227,66 @@ fn count_pulses(mut modules: HashMap<String, Module>, num_presses: usize) -> (us
         })
 }
 
+fn display_header(modules: &HashMap<String, Module>) {
+    let names = modules.keys().sorted().collect::<Vec<_>>();
+    print!("presses");
+
+    for name in names.iter() {
+        let module = modules.get(*name).unwrap();
+
+        if let ModuleHandler::Conjunction(conjunction) = &module.handler {
+            for _ in conjunction.last_pulse.keys() {
+                print!(",{}", name)
+            }
+        } else {
+            print!(",{}", name);
+        }
+    }
+    println!();
+
+    for name in names {
+        let module = modules.get(name).unwrap();
+
+        if let ModuleHandler::Conjunction(conjunction) = &module.handler {
+            let sources = conjunction.last_pulse.keys().sorted();
+            for source in sources {
+                print!(",{}", source)
+            }
+        } else {
+            print!(",");
+        }
+    }
+
+    println!();
+}
+
+fn display_modules(presses: usize, modules: &HashMap<String, Module>) {
+    print!("{}", presses);
+
+    let names = modules.keys().sorted();
+
+    for name in names {
+        let module = modules.get(name).unwrap();
+
+        match &module.handler {
+            ModuleHandler::Conjunction(conjunction) => {
+                let sources = conjunction.last_pulse.keys().sorted();
+
+                for source in sources {
+                    print!(",{}", conjunction.last_pulse.get(source).unwrap());
+                }
+            }
+            ModuleHandler::FlipFlop(flipflop) => {
+                print!(",{}", flipflop);
+            }
+            ModuleHandler::Broadcast(_) => {
+                print!(",1");
+            }
+        }
+    }
+    println!();
+}
+
 pub struct Solver {}
 
 impl super::Solver for Solver {
@@ -203,9 +319,16 @@ impl super::Solver for Solver {
         Ok(modules)
     }
 
-    fn solve(modules: Self::Problem) -> (Option<String>, Option<String>) {
-        let (low, high) = count_pulses(modules, 1000);
+    fn solve(mut modules: Self::Problem) -> (Option<String>, Option<String>) {
+        let (low, high) = count_pulses(modules.clone(), 1000);
         let part1 = low * high;
+
+        display_header(&modules);
+        display_modules(0, &modules);
+        for index in 1..=64000 {
+            press_button(&mut modules);
+            display_modules(index, &modules);
+        }
 
         (Some(part1.to_string()), None)
     }
