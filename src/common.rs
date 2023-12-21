@@ -17,10 +17,10 @@ impl Position {
         self.x.abs_diff(other.x) + self.y.abs_diff(other.y)
     }
 
-    pub fn adjacent(&self) -> impl Iterator<Item = Position> + '_ {
+    pub fn adjacent(self) -> impl Iterator<Item = Position> {
         [(1, 0), (0, 1), (-1, 0), (0, -1)]
             .into_iter()
-            .map(|(dx, dy)| Position {
+            .map(move |(dx, dy)| Position {
                 x: self.x + dx,
                 y: self.y + dy,
             })
